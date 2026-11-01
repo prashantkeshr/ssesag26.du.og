@@ -2,6 +2,8 @@
 import BaseLayout      from '@/layouts/BaseLayout.astro';
 import { DiscoverFeed } from '@/components/discover/DiscoverFeed';
 import { provider }     from '@/lib/providers';
+import { readFileSync } from 'fs';
+import { join }         from 'path';
 
 const [allMedia, allCreators] = await Promise.all([
   provider.getMedia(),
@@ -22,6 +24,31 @@ while (si < sight.length || hi < hearing.length) {
   if (si < sight.length) feed.push(sight[si++]);
   if (hi < hearing.length) feed.push(hearing[hi++]);
 }
+
+// Load music pool from chunk 0 at build time for reel background tracks
+interface MusicTrack {
+  id: string;
+  title: string;
+  creatorName: string;
+  artworkUrl: string;
+  streamUrl: string;
+}
+
+let musicPool: MusicTrack[] = [];
+try {
+  const raw: any[] = JSON.parse(
+    readFileSync(join(process.cwd(), 'public', 'data', 'pb', 'music', 'chunks', '0.json'), 'utf-8')
+  );
+  musicPool = raw
+    .filter((t: any) => t.data?.streamUrl && t.data?.artworkUrl)
+    .map((t: any) => ({
+      id:          t.id,
+      title:       t.title ?? 'Unknown Track',
+      creatorName: t.creatorName ?? 'Unknown',
+      artworkUrl:  t.data.artworkUrl,
+      streamUrl:   t.data.streamUrl,
+    }));
+} catch { /* chunks not generated yet */ }
 ---
 
 <BaseLayout
@@ -34,5 +61,6 @@ while (si < sight.length || hi < hearing.length) {
     client:load
     media={feed}
     creators={allCreators}
+    musicPool={musicPool}
   />
 </BaseLayout>

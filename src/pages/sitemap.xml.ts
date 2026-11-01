@@ -1,6 +1,8 @@
 import type { APIRoute } from 'astro';
 import { provider } from '@/lib/providers';
 import topTagsRaw from '@data/pb/top-tags.json';
+import { readFileSync, readdirSync } from 'fs';
+import { join } from 'path';
 
 const SITE  = 'https://senses.dhurta.org';
 const TODAY = new Date().toISOString().split('T')[0];
@@ -21,12 +23,57 @@ function escXml(s: string) {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
+// Read all items from a directory of JSON chunk files
+function readChunkDir(absPath: string): any[] {
+  try {
+    const items: any[] = [];
+    for (const file of readdirSync(absPath)) {
+      if (!file.endsWith('.json')) continue;
+      const chunk: any[] = JSON.parse(readFileSync(join(absPath, file), 'utf-8'));
+      items.push(...chunk);
+    }
+    return items;
+  } catch { return []; }
+}
+
 export const GET: APIRoute = async () => {
+  const root = process.cwd();
+
   const [allMedia, allCreators, allCollections] = await Promise.all([
     provider.getMedia({}),
     provider.getCreators(500),
     provider.getCollections(),
   ]);
+
+  // Read all Pixabay items at build time for complete detail page coverage
+  const pbPhotos  = readChunkDir(join(root, 'public', 'data', 'pb', 'chunks'));
+  const pbVideos  = readChunkDir(join(root, 'public', 'data', 'pb', 'videos', 'chunks'));
+  const pbMusic   = readChunkDir(join(root, 'public', 'data', 'pb', 'music', 'chunks'));
+  let   pb3d: any[] = [];
+  try { pb3d = JSON.parse(readFileSync(join(root, 'public', 'data', 'pb', '3d', 'all.json'), 'utf-8')); } catch {}
+
+  // Deduplicate by slug
+  const pbSlugSet = new Set<string>();
+  const pbItems: { slug: string; type: string; division: string; thumbnail: string; title: string }[] = [];
+
+  function addPb(arr: any[], division: string) {
+    for (const item of arr) {
+      if (!item.slug || pbSlugSet.has(item.slug)) continue;
+      pbSlugSet.add(item.slug);
+      pbItems.push({
+        slug: item.slug,
+        type: item.type ?? (division === 'hearing' ? 'music' : 'photo'),
+        division,
+        thumbnail: item.thumbnail ?? item.data?.thumbnailUrl ?? '',
+        title: item.title ?? '',
+      });
+    }
+  }
+
+  addPb(pbPhotos, 'sight');
+  addPb(pbVideos, 'sight');
+  addPb(pb3d,     'sight');
+  addPb(pbMusic,  'hearing');
 
   const allTags   = [...new Set(allMedia.flatMap(m => m.tags))];
   const allMoods  = [...new Set(allMedia.flatMap(m => m.moods))];
@@ -49,7 +96,7 @@ export const GET: APIRoute = async () => {
     url('/editorial',   { priority: '0.7', freq: 'weekly' }),
     url('/search',      { priority: '0.7', freq: 'weekly' }),
 
-    // ── Static info pages (no noIndex pages here) ─────────────────
+    // ── Static info pages ─────────────────────────────────────────
     url('/about',               { priority: '0.7', freq: 'monthly' }),
     url('/faq',                 { priority: '0.7', freq: 'monthly' }),
     url('/creators',            { priority: '0.7', freq: 'weekly' }),
@@ -62,22 +109,21 @@ export const GET: APIRoute = async () => {
     url('/free-photos',         { priority: '0.9', freq: 'weekly' }),
     url('/free-illustrations',  { priority: '0.9', freq: 'weekly' }),
     url('/free-vectors',        { priority: '0.9', freq: 'weekly' }),
-    // Note: /settings, /my-senses, /ambassadors, /contests, /live,
-    //       /forum, /senses-radio, /api are all noIndex — excluded.
 
     // ── Sight sections ────────────────────────────────────────────
-    url('/sight/photos',        { priority: '0.7' }),
-    url('/sight/videos',        { priority: '0.7' }),
-    url('/sight/illustrations', { priority: '0.7' }),
-    url('/sight/wallpapers',    { priority: '0.7' }),
+    url('/sight/photos',        { priority: '0.8' }),
+    url('/sight/videos',        { priority: '0.8' }),
+    url('/sight/illustrations', { priority: '0.8' }),
+    url('/sight/wallpapers',    { priority: '0.8' }),
+    url('/sight/3d-models',     { priority: '0.8' }),
 
     // ── Hearing sections ──────────────────────────────────────────
-    url('/hearing/music',   { priority: '0.7' }),
-    url('/hearing/sounds',  { priority: '0.7' }),
-    url('/hearing/ambient', { priority: '0.7' }),
-    url('/hearing/lo-fi',   { priority: '0.7' }),
+    url('/hearing/music',   { priority: '0.8' }),
+    url('/hearing/sounds',  { priority: '0.8' }),
+    url('/hearing/ambient', { priority: '0.8' }),
+    url('/hearing/lo-fi',   { priority: '0.8' }),
 
-    // ── Media detail pages (with image extensions for sight) ──────
+    // ── Curated media detail pages ────────────────────────────────
     ...allMedia.map(m => {
       const lastmod = m.createdAt ? new Date(m.createdAt).toISOString().split('T')[0] : TODAY;
       const thumbnail = (m as any).data?.thumbnailUrl ?? (m as any).thumbnail ?? '';
@@ -85,6 +131,14 @@ export const GET: APIRoute = async () => {
         ? [{ loc: thumbnail, title: m.title }]
         : [];
       return url(`/${m.division}/${m.type}/${m.slug}`, { priority: '0.8', freq: 'monthly', lastmod, images });
+    }),
+
+    // ── Pixabay detail pages (all 16k+ items) ─────────────────────
+    ...pbItems.map(item => {
+      const images = item.division === 'sight' && item.thumbnail
+        ? [{ loc: item.thumbnail, title: item.title }]
+        : [];
+      return url(`/${item.division}/${item.type}/${item.slug}`, { priority: '0.7', freq: 'monthly', images });
     }),
 
     // ── Creator pages ─────────────────────────────────────────────
