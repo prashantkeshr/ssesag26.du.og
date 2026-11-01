@@ -7,14 +7,17 @@ import { join } from 'path';
 const SITE  = 'https://senses.dhurta.org';
 const TODAY = new Date().toISOString().split('T')[0];
 
+const PB_LICENSE = 'https://pixabay.com/service/license-summary/';
+
 function url(
   path: string,
-  opts: { priority?: string; freq?: string; lastmod?: string; images?: { loc: string; title: string }[] } = {},
+  opts: { priority?: string; freq?: string; lastmod?: string; images?: { loc: string; title: string; license?: string }[] } = {},
 ): string {
   const { priority = '0.6', freq = 'weekly', lastmod = TODAY, images = [] } = opts;
-  const imgTags = images.map(img =>
-    `    <image:image>\n      <image:loc>${escXml(img.loc)}</image:loc>\n      <image:title>${escXml(img.title)}</image:title>\n    </image:image>`
-  ).join('\n');
+  const imgTags = images.map(img => {
+    const licLine = img.license ? `\n      <image:license>${escXml(img.license)}</image:license>` : '';
+    return `    <image:image>\n      <image:loc>${escXml(img.loc)}</image:loc>\n      <image:title>${escXml(img.title)}</image:title>${licLine}\n    </image:image>`;
+  }).join('\n');
   const imgBlock = imgTags ? `\n${imgTags}` : '';
   return `  <url>\n    <loc>${SITE}${path}</loc>\n    <lastmod>${lastmod}</lastmod>\n    <changefreq>${freq}</changefreq>\n    <priority>${priority}</priority>${imgBlock}\n  </url>`;
 }
@@ -128,7 +131,7 @@ export const GET: APIRoute = async () => {
       const lastmod = m.createdAt ? new Date(m.createdAt).toISOString().split('T')[0] : TODAY;
       const thumbnail = (m as any).data?.thumbnailUrl ?? (m as any).thumbnail ?? '';
       const images = m.division === 'sight' && thumbnail
-        ? [{ loc: thumbnail, title: m.title }]
+        ? [{ loc: thumbnail, title: m.title, license: PB_LICENSE }]
         : [];
       return url(`/${m.division}/${m.type}/${m.slug}`, { priority: '0.8', freq: 'monthly', lastmod, images });
     }),
@@ -136,7 +139,7 @@ export const GET: APIRoute = async () => {
     // ── Pixabay detail pages (all 16k+ items) ─────────────────────
     ...pbItems.map(item => {
       const images = item.division === 'sight' && item.thumbnail
-        ? [{ loc: item.thumbnail, title: item.title }]
+        ? [{ loc: item.thumbnail, title: item.title, license: PB_LICENSE }]
         : [];
       return url(`/${item.division}/${item.type}/${item.slug}`, { priority: '0.7', freq: 'monthly', images });
     }),

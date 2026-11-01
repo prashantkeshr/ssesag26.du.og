@@ -201,6 +201,11 @@ const licenseLabels: Record<string, string> = {
   editorial: 'Editorial Use Only', commercial: 'Commercial License',
   'senses-original': 'Senses Original', placeholder: 'Placeholder (V1)', pixabay: 'Pixabay License',
 };
+
+const siteRoot = 'https://senses.dhurta.org';
+const pageUrl  = `${siteRoot}/${media.division}/${media.type}/${media.slug}`;
+const buildDate = new Date().toISOString().split('T')[0];
+const creatorLabel = (isPb ? (media as any).creatorName : creator?.displayName) ?? 'Unknown';
 ---
 
 {mediaKind === 'model' && (
@@ -357,6 +362,7 @@ if (document.readyState === 'loading') {
   title={media.seo.title}
   description={media.seo.description}
   ogImage={ogImage}
+  ogType={mediaKind === 'video' ? 'video.other' : 'article'}
   schema={{
     "@context": "https://schema.org",
     "@graph": [
@@ -364,29 +370,45 @@ if (document.readyState === 'loading') {
         "@type": "3DModel",
         "name": media.title,
         "description": media.description,
+        "url": pageUrl,
         "thumbnailUrl": ogImage,
-        "creator": isPb && media.creatorName ? { "@type": "Person", "name": media.creatorName } : undefined,
+        "creator": creatorLabel !== 'Unknown' ? { "@type": "Person", "name": creatorLabel } : undefined,
       } : mediaKind === 'video' ? {
         "@type": "VideoObject",
         "name": media.title,
         "description": media.description,
+        "url": pageUrl,
         "thumbnailUrl": ogImage,
+        "embedUrl": pageUrl,
+        "uploadDate": media.createdAt || buildDate,
         "duration": videoData?.duration ? `PT${Math.floor(videoData.duration)}S` : undefined,
-        "creator": isPb && media.creatorName ? { "@type": "Person", "name": media.creatorName } : undefined,
+        "creator": creatorLabel !== 'Unknown' ? { "@type": "Person", "name": creatorLabel } : undefined,
+        "creditText": creatorLabel,
+        "copyrightNotice": "Free for commercial use – no attribution required",
+        "license": "https://pixabay.com/service/license-summary/",
+        "acquireLicensePage": `${siteRoot}/licensing`,
       } : {
         "@type": "ImageObject",
         "name": media.title,
         "description": media.description,
+        "url": pageUrl,
         "contentUrl": ogImage,
-        "creator": isPb && media.creatorName ? { "@type": "Person", "name": media.creatorName } : creator ? { "@type": "Person", "name": creator.displayName } : undefined,
+        "thumbnailUrl": ogImage,
+        "width": imgData?.width ?? undefined,
+        "height": imgData?.height ?? undefined,
+        "encodingFormat": "image/jpeg",
+        "creator": creatorLabel !== 'Unknown' ? { "@type": "Person", "name": creatorLabel } : undefined,
+        "creditText": creatorLabel,
+        "copyrightNotice": "Free for commercial use – no attribution required",
         "license": "https://pixabay.com/service/license-summary/",
+        "acquireLicensePage": `${siteRoot}/licensing`,
       },
       {
         "@type": "BreadcrumbList",
         "itemListElement": [
-          { "@type": "ListItem", "position": 1, "name": "Senses", "item": "https://senses.dhurta.org" },
-          { "@type": "ListItem", "position": 2, "name": "SIGHT",  "item": "https://senses.dhurta.org/sight" },
-          { "@type": "ListItem", "position": 3, "name": media.type.charAt(0).toUpperCase() + media.type.slice(1), "item": `https://senses.dhurta.org/sight/${media.type}` },
+          { "@type": "ListItem", "position": 1, "name": "Senses", "item": siteRoot },
+          { "@type": "ListItem", "position": 2, "name": "SIGHT",  "item": `${siteRoot}/sight` },
+          { "@type": "ListItem", "position": 3, "name": media.type.charAt(0).toUpperCase() + media.type.slice(1), "item": `${siteRoot}/sight/${media.type}` },
           { "@type": "ListItem", "position": 4, "name": media.title },
         ],
       },

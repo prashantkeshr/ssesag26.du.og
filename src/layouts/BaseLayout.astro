@@ -10,11 +10,13 @@ interface Props {
   description:     string;
   canonical?:      string;
   ogImage?:        string;
+  ogType?:         string;
   noIndex?:        boolean;
   schema?:         object;
   bodyClass?:      string;
   noFooter?:       boolean;
   bingVerify?:     string;
+  googleVerify?:   string;
   yandexVerify?:   string;
 }
 
@@ -23,11 +25,13 @@ const {
   description,
   canonical,
   ogImage,
+  ogType = 'website',
   noIndex = false,
   schema,
   bodyClass = '',
   noFooter = false,
   bingVerify,
+  googleVerify,
   yandexVerify,
 } = Astro.props;
 
@@ -81,16 +85,19 @@ const fullTitle = title.includes('Senses') ? title : `${title} — Senses`;
   }
   <link rel="canonical" href={fullUrl} />
 
-  <!-- Webmaster verification (add your codes to the page that needs them) -->
-  {bingVerify   && <meta name="msvalidate.01"        content={bingVerify} />}
-  {yandexVerify && <meta name="yandex-verification"  content={yandexVerify} />}
+  <!-- Webmaster verification -->
+  {googleVerify && <meta name="google-site-verification" content={googleVerify} />}
+  {bingVerify   && <meta name="msvalidate.01"            content={bingVerify} />}
+  {yandexVerify && <meta name="yandex-verification"      content={yandexVerify} />}
+  <!-- Legacy image hint for crawlers -->
+  {ogImage && ogImage !== `${siteUrl}/og-default.png` && <link rel="image_src" href={ogImage} />}
 
   <!-- Performance: preconnect to image CDN used by all media thumbnails -->
   <link rel="preconnect"  href="https://cdn.pixabay.com" crossorigin />
   <link rel="dns-prefetch" href="https://cdn.pixabay.com" />
 
   <!-- OpenGraph -->
-  <meta property="og:type"         content="website" />
+  <meta property="og:type"         content={ogType} />
   <meta property="og:url"          content={fullUrl} />
   <meta property="og:title"        content={fullTitle} />
   <meta property="og:description"  content={description} />
