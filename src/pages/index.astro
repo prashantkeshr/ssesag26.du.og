@@ -4,12 +4,16 @@ import Hero from '@/components/home/Hero';
 import CategoryStrip from '@/components/home/CategoryStrip';
 import MoodStrip from '@/components/home/MoodStrip.astro';
 import DiscoverySection from '@/components/home/DiscoverySection';
+import { HomeDiscoverMore } from '@/components/home/HomeDiscoverMore';
 import CrossSensorySection from '@/components/home/CrossSensorySection';
 import CreatorsRow from '@/components/home/CreatorsRow';
 import { ForYouSection }    from '@/components/personalization/ForYouSection';
 import { RecentlyViewed }   from '@/components/personalization/RecentlyViewed';
 import { BannerAd }         from '@/components/ads/AdSlot';
 import { provider } from '@/lib/providers/index';
+import { readFileSync } from 'fs';
+import { join } from 'path';
+import type { Media } from '@/types/index';
 
 // Parallel data fetching
 const [trending, featured, editorsPicks, latest, creators, categories, collections, allMedia] = await Promise.all([
@@ -22,6 +26,25 @@ const [trending, featured, editorsPicks, latest, creators, categories, collectio
   provider.getCollections(),
   provider.getMedia({}),
 ]);
+
+// Build-time initial pool for "Discover More" — interleave photos, videos, music
+function readChunk(rel: string): any[] {
+  try { return JSON.parse(readFileSync(join(process.cwd(), 'public', rel), 'utf-8')); }
+  catch { return []; }
+}
+const photoChunk0 = readChunk('data/pb/chunks/0.json');
+const videoChunk0 = readChunk('data/pb/videos/chunks/0.json');
+const musicChunk0 = readChunk('data/pb/music/chunks/0.json');
+
+// Interleave ~20 photos, 10 videos, 10 music = 40 initial items
+const discoverInitial: Media[] = [];
+let pi = 0, vi = 0, mi = 0;
+while (discoverInitial.length < 40 && (pi < photoChunk0.length || vi < videoChunk0.length || mi < musicChunk0.length)) {
+  if (pi < photoChunk0.length && discoverInitial.length < 40) discoverInitial.push(photoChunk0[pi++] as Media);
+  if (pi < photoChunk0.length && discoverInitial.length < 40) discoverInitial.push(photoChunk0[pi++] as Media);
+  if (vi < videoChunk0.length && discoverInitial.length < 40) discoverInitial.push(videoChunk0[vi++] as Media);
+  if (mi < musicChunk0.length && discoverInitial.length < 40) discoverInitial.push(musicChunk0[mi++] as Media);
+}
 
 const schema = {
   "@context": "https://schema.org",
@@ -56,6 +79,17 @@ const schema = {
 
   <!-- Content -->
   <div class="max-w-[1440px] mx-auto">
+
+    <!-- Discover More — random mix, refreshed every visit -->
+    <div class="border-b border-senses-border">
+      <HomeDiscoverMore
+        client:load
+        initialItems={discoverInitial}
+        photosStart={1}
+        videosStart={1}
+        musicStart={1}
+      />
+    </div>
 
     <!-- Trending Now -->
     <DiscoverySection
