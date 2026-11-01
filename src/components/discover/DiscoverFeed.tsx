@@ -223,7 +223,7 @@ export function DiscoverFeed({ media, creators, musicPool }: Props) {
   const [saved,       setSaved]       = useState<Set<string>>(new Set());
   const [shareTarget, setShareTarget] = useState<Media | null>(null);
   const [playing,     setPlaying]     = useState<string | null>(null); // hearing audio
-  const [muted,       setMuted]       = useState(true);
+  const [muted,       setMuted]       = useState(false);
   const [mounted,     setMounted]     = useState(false);
   const [portrait,    setPortrait]    = useState(false);
   const [showHint,    setShowHint]    = useState(false);
@@ -295,16 +295,25 @@ export function DiscoverFeed({ media, creators, musicPool }: Props) {
     } else if (m.type === 'video') {
       const vid = videoRefs.current[m.id];
       if (vid) {
-        vid.muted = muted;
-        vid.play().catch(() => {});
+        // Browsers require muted=true for autoplay; unmute after play() resolves
+        vid.muted = true;
+        vid.play()
+          .then(() => { vid.muted = muted; })
+          .catch(() => {});
       }
-      // Also play bg music for the video
+      // Background music for the video card
       const bg = bgAudioRefs.current[m.id];
-      if (bg && !muted) { bg.muted = false; bg.play().catch(() => {}); }
+      if (bg) {
+        bg.muted = muted;
+        bg.play().catch(() => { bg.muted = true; bg.play().catch(() => {}); });
+      }
     } else {
-      // Photo / illustration / 3D
+      // Photo / illustration / 3D — play background music unmuted
       const bg = bgAudioRefs.current[m.id];
-      if (bg) { bg.muted = muted; if (!muted) bg.play().catch(() => {}); }
+      if (bg) {
+        bg.muted = muted;
+        bg.play().catch(() => { bg.muted = true; bg.play().catch(() => {}); });
+      }
     }
   }, [muted]);
 
