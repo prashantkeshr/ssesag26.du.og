@@ -4,6 +4,7 @@ import type { Media, Creator, MediaDivision, MediaType } from '@/types/index';
 import { MediaCard } from '@/components/media/MediaCard';
 import { mediaTypeLabel, formatCount } from '@/lib/utils/formatters';
 import { addSearchHistory } from '@/lib/utils/localState';
+import { SearchSuggestedSection } from './SearchSuggestedSection';
 
 // Converts a raw tag-file item into the Media shape SearchPage can render
 function tagItemToMedia(item: any): Media {
@@ -469,6 +470,15 @@ export function SearchPage({ media, creators }: Props) {
             </section>
           )}
         </>
+      )}
+
+      {/* ── Related / Suggested section ──────────────────────────────── */}
+      {query.trim() && pbTagSlug && pbItems.length > 0 && (
+        <SearchSuggestedSection
+          query={query.trim()}
+          primaryTagSlug={pbTagSlug}
+          excludeIds={[...results.map(m => m.id), ...pbItems.map(m => m.id)]}
+        />
       )}
     </div>
   );
