@@ -2,16 +2,43 @@
 import BaseLayout  from '@/layouts/BaseLayout.astro';
 import { SearchPage } from '@/components/search/SearchPage';
 import { provider }   from '@/lib/providers';
+import topTagsRaw from '@data/pb/top-tags.json';
 
 const [allMedia, allCreators] = await Promise.all([
   provider.getMedia(),
   provider.getCreators(50),
 ]);
+
+// Total unique items in the library (curated + Pixabay tag index)
+const pbTotalEstimate = topTagsRaw.reduce((sum, t) => sum + (t.count ?? 0), 0);
+const libraryLabel = pbTotalEstimate > 1_000_000
+  ? `${(pbTotalEstimate / 1_000_000).toFixed(1)}M+`
+  : pbTotalEstimate > 0
+    ? `${Math.round(pbTotalEstimate / 1000)}k+`
+    : '10,000+';
+
+// Infer initial query from URL for SSR-friendly description
+const urlQuery = Astro.url.searchParams.get('q') ?? '';
+const pageTitle = urlQuery
+  ? `"${urlQuery}" — Free Photos, Videos & Music — Senses`
+  : 'Search Free Photos, Videos & Music — Senses';
+const pageDesc = urlQuery
+  ? `Search results for "${urlQuery}" on Senses. Free royalty-free ${urlQuery} photos, videos, music, and more. No attribution required.`
+  : `Search ${libraryLabel} free photos, videos, music, illustrations and ambient sounds. Royalty-free, no attribution required.`;
+
+const schema = {
+  "@context": "https://schema.org",
+  "@type": "SearchResultsPage",
+  "name": pageTitle,
+  "description": pageDesc,
+  "url": `https://senses.dhurta.org/search${urlQuery ? `?q=${encodeURIComponent(urlQuery)}` : ''}`,
+};
 ---
 
 <BaseLayout
-  title="Search — Senses"
-  description="Search thousands of premium photos, videos, music, and ambient sounds. Filter by mood, style, category, and more."
+  title={pageTitle}
+  description={pageDesc}
+  schema={schema}
 >
   <div class="pt-[var(--nav-height)] pb-20">
 
@@ -22,9 +49,13 @@ const [allMedia, allCreators] = await Promise.all([
         <span class="text-senses-text-3 text-xs">×</span>
         <span class="text-senses-hearing text-xs tracking-widest uppercase font-medium">HEARING</span>
       </div>
-      <h1 class="text-display-lg text-senses-text leading-tight">Search</h1>
+      <h1 class="text-display-lg text-senses-text leading-tight">
+        {urlQuery ? `"${urlQuery}"` : 'Search'}
+      </h1>
       <p class="text-senses-text-3 text-sm mt-1 max-w-lg">
-        {allMedia.length} items across visual and audio media
+        {urlQuery
+          ? `Free ${urlQuery} photos, videos, music & more — royalty-free`
+          : `${libraryLabel} free media across visual and audio`}
       </p>
     </div>
 

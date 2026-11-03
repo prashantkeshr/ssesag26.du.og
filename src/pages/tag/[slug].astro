@@ -100,6 +100,17 @@ const schema = {
               <span class="text-xs text-senses-text-3 border border-senses-border/60 px-2 py-0.5 rounded-full">{b}</span>
             ))}
           </div>
+          <div class="mt-4">
+            <a
+              href={`/search?q=${encodeURIComponent(displayTag)}`}
+              class="inline-flex items-center gap-1.5 text-xs text-senses-text-3 hover:text-senses-text transition-colors border border-senses-border/50 rounded-full px-3 py-1.5"
+            >
+              <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" class="w-3.5 h-3.5 flex-shrink-0">
+                <path stroke-linecap="round" stroke-linejoin="round" d="m19 19-4.35-4.35m0 0A7.5 7.5 0 1 0 4.35 4.35a7.5 7.5 0 0 0 10.3 10.3Z"/>
+              </svg>
+              Search "{displayTag}" across all media →
+            </a>
+          </div>
         </div>
         {(sightItems.length > 0 || hearingItems.length > 0) && (
           <div class="flex gap-4">
@@ -164,9 +175,14 @@ const schema = {
       {curatedItems.length === 0 && pbCount === 0 && (
         <div class="py-24 text-center">
           <p class="text-senses-text-3 text-lg">No images found for "{displayTag}"</p>
-          <a href="/royalty-free-images" class="mt-4 inline-block text-senses-text-3 hover:text-senses-text text-sm transition-colors">
-            ← Browse all free images
-          </a>
+          <div class="flex gap-3 justify-center mt-4">
+            <a href={`/search?q=${encodeURIComponent(displayTag)}`} class="px-5 py-2.5 rounded-xl bg-senses-surface border border-senses-border text-senses-text-2 text-sm hover:border-senses-border-2 transition-all">
+              Search for "{displayTag}" →
+            </a>
+            <a href="/royalty-free-images" class="text-senses-text-3 hover:text-senses-text text-sm transition-colors self-center">
+              Browse all images
+            </a>
+          </div>
         </div>
       )}
 

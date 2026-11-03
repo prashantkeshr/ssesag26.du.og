@@ -5,6 +5,31 @@ import { MediaCard } from '@/components/media/MediaCard';
 import { mediaTypeLabel, formatCount } from '@/lib/utils/formatters';
 import { addSearchHistory } from '@/lib/utils/localState';
 
+// Converts a raw tag-file item into the Media shape SearchPage can render
+function tagItemToMedia(item: any): Media {
+  return {
+    id: item.id, type: (item.type ?? 'photo') as Media['type'],
+    division: 'sight', slug: item.slug, title: item.title,
+    description: `Free ${item.type ?? 'photo'} — royalty-free, no attribution required.`,
+    creator: '', thumbnail: item.thumbnail, category: 'general',
+    tags: Array.isArray(item.tags) ? item.tags : [],
+    moods: [], styles: [], colors: [],
+    orientation: (item.orientation ?? 'landscape') as Media['orientation'],
+    license: 'pixabay' as any, attribution: '', source: 'pixabay',
+    featured: false, trending: (item.views ?? 0) > 50000, editorsPick: false,
+    stats: { views: item.views ?? 0, downloads: 0, likes: 0, saves: 0 },
+    createdAt: '', updatedAt: '',
+    seo: { title: item.title, description: '', keywords: Array.isArray(item.tags) ? item.tags : [] },
+    data: {
+      width: item.thumbnailWidth ?? 640, height: item.thumbnailHeight ?? 480,
+      aspectRatio: '4:3', format: 'jpg',
+      thumbnailUrl: item.thumbnail, previewUrl: item.previewUrl ?? item.thumbnail,
+      fullUrl: item.previewUrl ?? item.thumbnail,
+      altText: `Free ${item.title} — royalty-free`, colors: [],
+    },
+  } as unknown as Media;
+}
+
 interface Props {
   media:    Media[];
   creators: Creator[];
@@ -47,6 +72,12 @@ export function SearchPage({ media, creators }: Props) {
   const [sightPage,   setSightPage]   = useState(1);
   const [hearingPage, setHearingPage] = useState(1);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Pixabay library augmentation state
+  const [pbItems,   setPbItems]   = useState<Media[]>([]);
+  const [pbLoading, setPbLoading] = useState(false);
+  const [pbTotal,   setPbTotal]   = useState(0);
+  const [pbTagSlug, setPbTagSlug] = useState('');
 
   const creatorMap = useMemo(
     () => Object.fromEntries(creators.map(c => [c.id, c])),
@@ -124,6 +155,40 @@ export function SearchPage({ media, creators }: Props) {
 
   // Reset pagination when results change
   useEffect(() => { setSightPage(1); setHearingPage(1); }, [query, division, typeFilter, sort]);
+
+  // Debounced Pixabay tag fetch — augments curated results with full library
+  useEffect(() => {
+    if (!mounted) return;
+    const trimmed = query.trim();
+    if (!trimmed) {
+      setPbItems([]); setPbTotal(0); setPbTagSlug(''); setPbLoading(false);
+      return;
+    }
+    let cancelled = false;
+    const slug = trimmed.toLowerCase().replace(/\s+/g, '-');
+    const slugs = [slug, ...(slug.includes('-') ? [slug.split('-')[0]] : [])];
+
+    const timer = setTimeout(async () => {
+      if (cancelled) return;
+      setPbLoading(true);
+      for (const s of slugs) {
+        try {
+          const res = await fetch(`/data/pb/tags/${encodeURIComponent(s)}.json`);
+          if (!res.ok || cancelled) continue;
+          const data = await res.json();
+          if (cancelled) return;
+          setPbItems((data.items ?? []).map(tagItemToMedia));
+          setPbTotal(data.total ?? 0);
+          setPbTagSlug(s);
+          setPbLoading(false);
+          return;
+        } catch {}
+      }
+      if (!cancelled) { setPbItems([]); setPbTotal(0); setPbTagSlug(''); setPbLoading(false); }
+    }, 400);
+
+    return () => { cancelled = true; clearTimeout(timer); };
+  }, [query, mounted]);
 
   const availableTypes = useMemo(() => {
     const base = division === 'all' ? media : media.filter(m => m.division === division);
@@ -260,21 +325,30 @@ export function SearchPage({ media, creators }: Props) {
       <div className="flex items-center justify-between mb-6">
         <p className="text-senses-text-2 text-sm">
           {query.trim()
-            ? <><span className="text-senses-text font-medium">{results.length}</span> {results.length === 1 ? 'result' : 'results'} for <span className="text-senses-accent">"{query}"</span></>
-            : <>8.8 million+ photos, videos &amp; music to explore</>
+            ? <>
+                <span className="text-senses-text font-medium">
+                  {results.length + pbItems.length}
+                  {pbTotal > pbItems.length ? '+' : ''}
+                </span>
+                {' '}{results.length + pbItems.length === 1 ? 'result' : 'results'} for{' '}
+                <span className="text-senses-accent">"{query}"</span>
+              </>
+            : <>Explore millions of free photos, videos &amp; music</>
           }
         </p>
-        {results.length > 0 && (
-          <p className="text-senses-text-3 text-xs">
+        {(results.length > 0 || pbItems.length > 0) && (
+          <p className="text-senses-text-3 text-xs flex items-center gap-1">
             {sightResults.length > 0 && <span className="text-senses-sight">{sightResults.length} visual</span>}
-            {sightResults.length > 0 && hearingResults.length > 0 && <span className="mx-1 opacity-30">·</span>}
+            {sightResults.length > 0 && hearingResults.length > 0 && <span className="opacity-30">·</span>}
             {hearingResults.length > 0 && <span className="text-senses-hearing">{hearingResults.length} audio</span>}
+            {pbItems.length > 0 && (sightResults.length + hearingResults.length > 0) && <span className="opacity-30">·</span>}
+            {pbItems.length > 0 && <span>{pbTotal.toLocaleString()}+ in library</span>}
           </p>
         )}
       </div>
 
       {/* ── Empty results ────────────────────────────────────── */}
-      {results.length === 0 && query.trim() && (
+      {results.length === 0 && pbItems.length === 0 && !pbLoading && query.trim() && (
         <div className="py-24 text-center">
           <SearchIcon className="w-10 h-10 mx-auto text-senses-text-3 opacity-30 mb-4" />
           <p className="text-senses-text-2 text-lg mb-2">No results for "{query}"</p>
@@ -344,6 +418,52 @@ export function SearchPage({ media, creators }: Props) {
                   >
                     View more · {hearingResults.length - hearingPage * SEARCH_PAGE} remaining
                   </button>
+                </div>
+              )}
+            </section>
+          )}
+
+          {/* ── Pixabay library results ──────────────────────────────── */}
+          {query.trim() && (pbLoading || pbItems.length > 0) && (division === 'all' || division === 'sight') && (
+            <section className="mb-12">
+              <div className="flex items-center justify-between mb-5">
+                <div className="flex items-center gap-2">
+                  <div className={`w-2 h-2 rounded-full bg-senses-sight ${pbLoading ? 'animate-pulse' : ''}`} />
+                  <h2 className="text-senses-sight text-xs tracking-widest uppercase font-medium">
+                    {pbLoading
+                      ? 'Searching library…'
+                      : `Free ${query.trim()} images — ${pbTotal.toLocaleString()}+ available`}
+                  </h2>
+                </div>
+                {!pbLoading && pbTagSlug && (
+                  <a
+                    href={`/tag/${pbTagSlug}`}
+                    className="text-xs text-senses-text-3 hover:text-senses-text transition-colors flex-shrink-0 ml-4"
+                  >
+                    View all {pbTotal.toLocaleString()} →
+                  </a>
+                )}
+              </div>
+              <div className="columns-2 sm:columns-3 md:columns-4 lg:columns-5 gap-3 space-y-3">
+                {pbLoading
+                  ? Array.from({ length: 10 }).map((_, i) => (
+                      <div key={i} className="break-inside-avoid rounded-xl bg-senses-surface animate-pulse aspect-[4/3]" />
+                    ))
+                  : pbItems.map(m => (
+                      <div key={m.id} className="break-inside-avoid">
+                        <MediaCard media={m} layout="masonry" />
+                      </div>
+                    ))
+                }
+              </div>
+              {!pbLoading && pbTagSlug && pbTotal > pbItems.length && (
+                <div className="mt-6 text-center">
+                  <a
+                    href={`/tag/${pbTagSlug}`}
+                    className="inline-flex items-center gap-2 px-8 py-3 rounded-2xl border border-senses-border text-senses-text-2 text-sm hover:border-senses-accent/40 hover:text-senses-text transition-all"
+                  >
+                    Browse all {pbTotal.toLocaleString()} free {query.trim()} images →
+                  </a>
                 </div>
               )}
             </section>
