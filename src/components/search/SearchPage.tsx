@@ -5,6 +5,7 @@ import { MediaCard } from '@/components/media/MediaCard';
 import { mediaTypeLabel, formatCount } from '@/lib/utils/formatters';
 import { addSearchHistory } from '@/lib/utils/localState';
 import { SearchSuggestedSection } from './SearchSuggestedSection';
+import { useHiddenMedia } from '@/lib/hooks/useHiddenMedia';
 
 // Converts a raw tag-file item into the Media shape SearchPage can render
 function tagItemToMedia(item: any): Media {
@@ -80,6 +81,12 @@ export function SearchPage({ media, creators }: Props) {
   const [pbTotal,   setPbTotal]   = useState(0);
   const [pbTagSlug, setPbTagSlug] = useState('');
 
+  const hiddenIds = useHiddenMedia();
+  const visiblePbItems = useMemo(
+    () => hiddenIds.size > 0 ? pbItems.filter(m => !hiddenIds.has(m.id)) : pbItems,
+    [pbItems, hiddenIds]
+  );
+
   const creatorMap = useMemo(
     () => Object.fromEntries(creators.map(c => [c.id, c])),
     [creators]
@@ -140,6 +147,7 @@ export function SearchPage({ media, creators }: Props) {
     } else {
       items = fuse.search(query).map(r => r.item);
     }
+    if (hiddenIds.size > 0)    items = items.filter(m => !hiddenIds.has(m.id));
     if (division !== 'all')   items = items.filter(m => m.division === division);
     if (typeFilter !== 'all') items = items.filter(m => m.type === typeFilter);
 
@@ -425,7 +433,7 @@ export function SearchPage({ media, creators }: Props) {
           )}
 
           {/* ── Pixabay library results ──────────────────────────────── */}
-          {query.trim() && (pbLoading || pbItems.length > 0) && (division === 'all' || division === 'sight') && (
+          {query.trim() && (pbLoading || visiblePbItems.length > 0) && (division === 'all' || division === 'sight') && (
             <section className="mb-12">
               <div className="flex items-center justify-between mb-5">
                 <div className="flex items-center gap-2">
@@ -450,7 +458,7 @@ export function SearchPage({ media, creators }: Props) {
                   ? Array.from({ length: 10 }).map((_, i) => (
                       <div key={i} className="break-inside-avoid rounded-xl bg-senses-surface animate-pulse aspect-[4/3]" />
                     ))
-                  : pbItems.map(m => (
+                  : visiblePbItems.map(m => (
                       <div key={m.id} className="break-inside-avoid">
                         <MediaCard media={m} layout="masonry" />
                       </div>
@@ -477,7 +485,7 @@ export function SearchPage({ media, creators }: Props) {
         <SearchSuggestedSection
           query={query.trim()}
           primaryTagSlug={pbTagSlug}
-          excludeIds={[...results.map(m => m.id), ...pbItems.map(m => m.id)]}
+          excludeIds={[...results.map(m => m.id), ...visiblePbItems.map(m => m.id), ...hiddenIds]}
         />
       )}
     </div>

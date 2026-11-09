@@ -1,0 +1,17 @@
+---
+import BaseLayout from '@/layouts/BaseLayout.astro';
+import { MediaAdmin } from '@/components/admin/MediaAdmin';
+import { provider }   from '@/lib/providers';
+
+const allMedia = await provider.getMedia();
+---
+
+<BaseLayout
+  title="Media Manager — Senses Admin"
+  description="Manage media visibility on Senses."
+  noIndex={true}
+>
+  <div class="pt-[var(--nav-height)]">
+    <MediaAdmin client:load allMedia={allMedia} />
+  </div>
+</BaseLayout>

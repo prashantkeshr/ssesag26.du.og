@@ -1,7 +1,8 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import type { Media } from '@/types/index';
 import { MediaCard }   from '@/components/media/MediaCard';
 import { SkeletonCard } from '@/components/ui/SkeletonCard';
+import { useHiddenMedia } from '@/lib/hooks/useHiddenMedia';
 
 interface Props {
   initialItems:     Media[];
@@ -90,6 +91,11 @@ export function GalleryWall({
   const [isShuffling, setIsShuffling] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [exhausted,   setExhausted]   = useState(false);
+  const hiddenIds = useHiddenMedia();
+  const visibleItems = useMemo(
+    () => hiddenIds.size > 0 ? items.filter(m => !hiddenIds.has(m.id)) : items,
+    [items, hiddenIds]
+  );
   const photoIdx = useRef(startChunk);
   const videoIdx = useRef(startChunk);
   const musicIdx = useRef(startChunk);
@@ -198,7 +204,7 @@ export function GalleryWall({
       <div
         className={`gallery-wall px-0.5 pt-0.5 transition-opacity duration-200 ${isShuffling ? 'opacity-0' : 'opacity-100'}`}
       >
-        {items.map((item, idx) => (
+        {visibleItems.map((item, idx) => (
           <div
             key={`${item.id}-${idx}`}
             className="section-reveal"

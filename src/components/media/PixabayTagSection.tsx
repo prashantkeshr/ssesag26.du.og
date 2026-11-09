@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { MediaCard } from './MediaCard';
 import type { Media } from '@/types/index';
+import { useHiddenMedia } from '@/lib/hooks/useHiddenMedia';
 
 interface Props {
   tagSlug:  string;
@@ -52,6 +53,7 @@ export function PixabayTagSection({ tagSlug, tagLabel }: Props) {
   const [total, setTotal]   = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError]   = useState(false);
+  const hiddenIds = useHiddenMedia();
 
   useEffect(() => {
     let cancelled = false;
@@ -73,6 +75,8 @@ export function PixabayTagSection({ tagSlug, tagLabel }: Props) {
     return () => { cancelled = true; };
   }, [tagSlug]);
 
+  const visibleItems = hiddenIds.size > 0 ? items.filter(m => !hiddenIds.has(m.id)) : items;
+
   if (loading) {
     return (
       <div className="py-10">
@@ -91,7 +95,7 @@ export function PixabayTagSection({ tagSlug, tagLabel }: Props) {
     );
   }
 
-  if (error || items.length === 0) return null;
+  if (error || visibleItems.length === 0) return null;
 
   return (
     <section className="mb-12">
@@ -102,14 +106,14 @@ export function PixabayTagSection({ tagSlug, tagLabel }: Props) {
             Free {tagLabel} Images
           </h2>
         </div>
-        {total > items.length && (
+        {total > visibleItems.length && (
           <p className="text-senses-text-3 text-xs">
-            Showing {items.length} of {total.toLocaleString()} free {tagLabel} images
+            Showing {visibleItems.length} of {total.toLocaleString()} free {tagLabel} images
           </p>
         )}
       </div>
       <div className="columns-2 sm:columns-3 md:columns-4 lg:columns-5 gap-3 space-y-3">
-        {items.map(m => (
+        {visibleItems.map(m => (
           <div key={m.id} className="break-inside-avoid">
             <MediaCard media={m} layout="masonry" />
           </div>
